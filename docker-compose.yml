@@ -1,0 +1,27 @@
+version: "3.2"
+services:
+  sql:
+    image: microsoft/mssql-server-windows-express:2017-latest
+    environment:
+      - sa_password=Qb4PRa9Y@X2u
+      - ACCEPT_EULA=Y
+    # isolation: "hyperv"
+    ports:
+      - "1433:1433"
+    networks:
+      - webnet
+    volumes:
+      - type: bind
+        source: "C:\\temp"
+        target: "C:\\temp"
+  rendering:
+    image: umbraco-admin
+    ports:
+      - "8000:8000"
+    networks:
+      - webnet
+networks:
+  webnet:
+
+volumes:
+  db-data:

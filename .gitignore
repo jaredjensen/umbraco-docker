@@ -1,0 +1,2 @@
+src/umbraco/*
+!src/umbraco/Dockerfile
