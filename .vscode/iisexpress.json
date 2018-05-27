@@ -1,0 +1,6 @@
+{
+  "port": 39981,
+  "path": "c:\\source\\umbraco-docker",
+  "clr": "v4.0",
+  "protocol": "http"
+}
