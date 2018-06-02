@@ -1,8 +1,18 @@
 # Umbraco in Docker
 
+## Overview
+
+* Single-instance for administration and scheduling (aka "master server")
+* Multiple load-balanced instances (aka "front-end" servers)
+* All instances point at the same SQL container
+* Static content is stored on EFS
+* Explicit configuration of master server to avoid complexities of auto-configuration
+
 ## Starting from Scratch
 
-When starting a branch new site, you need to get your SQL Server container running, then initialize the Umbraco site on the host to get its configuration established.  At that point, you can create a Docker image.
+When starting a new site, you need to get your SQL Server container running, and then run the Umbraco startup wizard on the host to establish the SQL connection string and machine key.  At that point, you can create a Docker image.  When you create the master/slave images, you will set the `LoadBalancer.*` web.config settings appropriately.
+
+`>> todo: set in Dockerfile based on env var`
 
 ### Run SQL Container
 
@@ -60,3 +70,8 @@ docker inspect umbraco-docker_rendering_1
 ```
 
 Navigate to http://**{umbraco-ip}**:8000 to confirm the site is working.
+
+## References
+
+* [Umbraco flexible load balancing](https://our.umbraco.org/documentation/getting-started/setup/server-setup/load-balancing/flexible)
+* [Explicit master scheduling server](https://our.umbraco.org/documentation/getting-started/setup/server-setup/load-balancing/flexible-advanced#explicit-master-scheduling-server)
