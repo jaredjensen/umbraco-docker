@@ -2,74 +2,90 @@
 
 ## Overview
 
-* Single-instance for administration and scheduling (aka "master server")
-* Multiple load-balanced instances (aka "front-end" servers)
-* All instances point at the same SQL container
-* Static content is stored on EFS
-* Explicit configuration of master server to avoid complexities of auto-configuration
+The important points of this solution are:
 
-## Starting from Scratch
+* Use a single Umbraco instance for administration and scheduling (aka "master server")
+* Use multiple load-balanced Umbraco instances for rendering (aka "front-end" servers)
+* All Umbraco instances point at the same SQL Express container
+* Static content is stored on a shared file system
 
-When starting a new site, you need to get your SQL Server container running, and then run the Umbraco startup wizard on the host to establish the SQL connection string and machine key.  At that point, you can create a Docker image.  When you create the master/slave images, you will set the `LoadBalancer.*` web.config settings appropriately.
+To get things set up, you will:
 
-`>> todo: set in Dockerfile based on env var`
+1. Start the SQL container and create a blank database
+1. Run Umbraco on the host and complete the setup wizard
+1. Build the Umbraco Docker image
+1. Run everything locally with docker-compose
 
-### Run SQL Container
+## Setup
 
-Put your strong `sa` account password in the **sa_password** environment variable, start the SQL container, and inspect to find its IP address.
+### Start the SQL container and create a blank database
 
-```bash
-export sa_password=MySuperStrongPassword
-docker-compose up sql
-docker inspect umbraco-docker_sql_1
-```
-
-Use the IP address and `sa` account to connect SSMS and create a new, empty database named **umbraco** with data and log files in **C:\data**.
-
-### Initialize Umbraco
-
-Download [Umbraco](https://umbraco.com/) and unzip to **src/umbraco/site**.  [Run the site in IIS Express](https://our.umbraco.org/documentation/Getting-Started/Setup/Install/install-umbraco-with-vs-code) (or however you'd like) and proceed through the setup wizard.
-
-At the first step, select **Customize**.  Next, select **Custom connection string** and enter the following, substituting the SQL container IP address and your `sa` password:
+Select a strong password for the `sa` account.  Then run a SQL container to be accessible at `sqlexpress2017` from the other containers and with a host volume mounted at `C:\data`:
 
 ```bash
-Server=123.123.123.123;Database=umbraco;User Id=sa;Password=MySuperStrongPassword;MultipleActiveResultSets=True
+docker run -d -h sqlexpress2017 -e ACCEPT_EULA=Y -e sa_password="[YourStrongPassword]" --mount type=volume,source=umbraco_data,target=C:/data --name sqlexpress2017 microsoft/mssql-server-windows-express:2017-latest
 ```
 
-**Important!** Allow Umbraco to generate an ASP.NET machine key for your site.  Installing a starter kit site is optional.
-
-### Create Umbraco Docker Image
-
-We had to use an IP address in the SQL connection string for Umbraco to access that container from the host.  Before making the Docker image, we need to update the web.config to replace that IP with the docker container name.
-
-Open the web.config and change the connection string to:
+Now inspect the container to get its IP address:
 
 ```bash
-Server=umbraco-docker_sql_1;Database=umbraco;User Id=sa;Password=MySuperStrongPassword;MultipleActiveResultSets=True
+docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" sqlexpress2017
 ```
 
-Now build the Umbraco image:
+Connect using SSMS and create a new, empty database:
+
+```sql
+USE [master]
+GO
+
+CREATE DATABASE [umbraco] ON PRIMARY 
+( NAME = N'umbraco_data', FILENAME = N'C:\data\umbraco.mdf' )
+LOG ON
+( NAME = N'umbraco_log', FILENAME = N'C:\data\umbraco_log.ldf' )
+GO
+```
+
+### Run Umbraco on the host and complete the setup wizard
+
+Download [Umbraco](https://our.umbraco.org/download/) and unzip to **src/umbraco/site**.  [Run the site in IIS Express](https://our.umbraco.org/documentation/Getting-Started/Setup/Install/install-umbraco-with-vs-code) (or however you'd like) and proceed through the setup wizard.
+
+At the first step, select **Customize**.  Next, select **Custom connection string** and enter the following (substituting the password):
+
+```text
+Server=sqlexpress2017;Database=umbraco;User Id=sa;Password=[YourStrongPassword];MultipleActiveResultSets=True
+```
+
+**Important!** Allow Umbraco to generate a machine key for your site in the last step.  Installing a starter kit site is optional.
+
+You can now shut down IIS Express and stop/destroy the SQL container:
 
 ```bash
-docker build -t umbraco-admin ./src/umbraco
+docker stop sqlexpress2017
+docker container rm sqlexpress2017
 ```
 
-### Run Everything in Docker
+### Build the Umbraco Docker image
 
-If the SQL container is still running, stop it:
+Now that our Umbraco web.config is updated, we can build our Umbraco Docker image.  This will include our custom bits in `App_Code/LoadBalancing.cs`:
 
 ```bash
-docker stop umbraco-docker_sql_1
+docker build -t umbraco ./src/umbraco
 ```
 
-Now you can use docker-compose to start both containers, and then inspect to find the Umbraco container IP address:
+### Run everything locally with docker-compose
+
+At this point, the necessary components should be in place:
+
+* Initialized Umbraco database stored in host volume `umbraco_data`
+* Umbraco image that can be used as either master or slave
+
+To fire everything up, run:
 
 ```bash
 docker-compose up
-docker inspect umbraco-docker_rendering_1
 ```
 
-Navigate to http://**{umbraco-ip}**:8000 to confirm the site is working.
+You should now be able to access your Umbraco site at http://localhost:8000.
 
 ## References
 

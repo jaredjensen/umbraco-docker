@@ -1,6 +1,8 @@
 version: "3.2"
 services:
   sql:
+    container_name: sql
+    hostname: sqlexpress2017
     image: microsoft/mssql-server-windows-express:2017-latest
     ports:
       - "1433:1433"
@@ -8,21 +10,27 @@ services:
       - webnet
     environment:
       ACCEPT_EULA: "Y"
-      # attach_dbs: "[{'dbName':'umbraco2','dbFiles':['C:\\data\\umbraco.mdf','C:\\data\\umbraco_log.ldf']}]"
+      attach_dbs: "[{'dbName':'umbraco','dbFiles':['C:\\\\data\\\\umbraco.mdf','C:\\\\data\\\\umbraco_log.ldf']}]"
       sa_password: "9G%iixl#L&W2"
     volumes:
       - type: volume
         source: umbraco_data
         target: "C:\\data"
-  rendering:
-    image: umbraco-admin
+  admin:
+    container_name: umbraco_admin
+    hostname: umbraco_admin
+    image: umbraco
     ports:
       - "8000:8000"
     networks:
       - webnet
+    environment:
+      Umbraco_IsMaster: "true"
+      Umbraco_ApplicationUrl: "umbraco-admin"
 
 networks:
   webnet:
 
 volumes:
   umbraco_data:
+    external: true
